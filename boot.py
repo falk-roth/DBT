@@ -14,25 +14,33 @@ import bme680
 from bme680 import *
 import framebuf
 import requests
+
+
 from umqtt.simple import MQTTClient  # The MQTT Client Library 
 
 
 #Eindeutige Device ID
-device_ID = "aas-demonstrator.smartproduction.de:aas:PCB1"
-url = "http://twinserver.smartproduction.de:28443/aasServer/shells/" + device_ID
+device_ID = "PCB1"
+url = "http://twinserver.smartproduction.de:28443/aasServer/shells/aas-demonstrator.smartproduction.de:aas:"+ device_ID + "/aas/submodels/TechnicalData/submodel/submodelElements/TechnicalProperties/SoftwareConfig/value/"
 
 def get_configuration():
     try:
         response = requests.get(url)
         if response.status_code == 200:
-            aas = response.json()
-            print (aas)
+            configuration = response.json()
+            return configuration
         else:
             print("Kein gültiger ID-Wert.")
 
     except Exception as e:
         # Fang Ausnahmen ab, z.B. Netzwerkfehler
         print(f"Fehler beim Auslesen der ID: {str(e)}")
+        oled.sleep(False)
+        oled.fill(0)
+        oled.text ("Fehler beim", 0, 30, 1)
+        oled.text ("Auslesen der Konfiguration:", 0, 50, 1) 
+        oled.text ("Bitte neu starten:", 0, 70, 1)
+        oled.show ()
 
 
 #OLED initialisieren
@@ -90,6 +98,13 @@ oled.text("WLAN verbunden",0, 60, 1)
 oled.show()
 time.sleep(2)
 
+#IP auf Oled anzeigen(WLAN)
+oled.fill(0)
+oled.text("IP", 50, 50, 1)
+oled.text(str(station.ifconfig()[0]), 0, 70, 1)
+oled.show()
+time.sleep(5)
+
 """
 Connect to MQTT broker
 """
@@ -103,4 +118,4 @@ oled.text("MQTT verbunden", 0, 60, 1)
 oled.show()
 time.sleep(2)
 
-#get_configuration()
+get_configuration()

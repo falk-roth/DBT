@@ -1,3 +1,10 @@
+#Netzwerk SMart Produktion - Projekt DBT1 Team NSP
+#Versiom 1.0
+#13.12.2023
+
+
+#--------------------Libraries importieren-----------------------------------------
+
 import machine
 from machine import I2C, Pin
 import sh1107
@@ -6,68 +13,186 @@ from bme680 import *
 import framebuf
 import ujson
 from umqtt.simple import MQTTClient
-import usocket as socket
+import socket
+import _thread
 
-x = 1013.25
+#--------------------Variabeln definieren-------------------------------------------
+#-----------------------------------------------------------------------------------
 MQTT_TOPIC = "NSP Test"
 
-def bme_temperature():
+#Konfiguration aus der Verwaltungsschale
+configuration = get_configuration()
+
+#Framebuffer Smiley 
+buffer_good = bytearray(b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x0f\xf8\x00\x00?\xfe\x00\x00\xff\xff\x80\x01\xff\xff\xc0\x03\xff\xff\xe0\x07\xff\xff\xf0\x07\xff\xff\xf0\x0f\xff\xff\xf8\x0f\xff\xff\xfc\x1f\x8f\xf8\xfc\x1f\x87\xf0|\x1f\x87\xf0|\x1f\x8f\xf8\xfc\x1f\xff\xff\xfc\x1f\xff\xff\xfc\x1f\xff\xff\xfc\x1f\xff\xff\xfc\x0f\xff\xff\xfc\x0f\x80\x00\xf8\x0f\x80\x00\xf8\x07\xc0\x01\xf0\x03\xe0\x03\xe0\x01\xfc\x1f\xc0\x00\xff\xff\x80\x00\x7f\xff\x00\x00\x1f\xfc\x00\x00\x01\x80\x00')
+buffer_ok = bytearray(b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x0f\xf0\x00\x00?\xfe\x00\x00\xff\xff\x00\x01\xff\xff\x80\x03\xff\xff\xc0\x07\xff\xff\xe0\x07\xff\xff\xf0\x0f\xff\xff\xf0\x0f\xdf\xfb\xf0\x0f\x8f\xf1\xf8\x1f\x87\xf0\xf8\x1f\x8f\xf1\xf8\x1f\xff\xff\xf8\x1f\xff\xff\xf8\x1f\xff\xff\xf8\x0f\xff\xff\xf8\x0f\xff\xff\xf0\x0f\x9f\xf9\xf0\x07\xcf\xf3\xf0\x07\xe3\xc7\xe0\x03\xf8\x1f\xc0\x01\xff\xff\x80\x00\xff\xff\x00\x00?\xfc\x00\x00\x0f\xf0\x00\x00\x00\x00\x00\x00\x00\x00\x00')
+buffer_bad = bytearray (b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x0f\xfc\x00\x00?\xff\x00\x00\x7f\xff\x80\x00\xff\xff\xc0\x01\xff\xff\xe0\x03\xff\xff\xf0\x03\xff\xff\xf8\x07\xff\xff\xf8\x07\xef\xfd\xf8\x0f\xc7\xf8\xfc\x0f\xc3\xf8|\x0f\xc7\xf8\xfc\x0f\xef\xff\xfc\x0f\xff\xff\xfc\x0f\xff\xff\xfc\x0f\xff\xff\xfc\x07\xfc\x0f\xf8\x07\xf1\xe3\xf8\x03\xe7\xf9\xf8\x03\xcf\xfc\xf0\x01\xff\xff\xe0\x00\xff\xff\xc0\x00\x7f\xff\x80\x00?\xff\x00\x00\x0f\xfc\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00') 
+
+#---------------------Funktionen definieren------------------------------------------
+#------------------------------------------------------------------------------------
+
+
+#-------------- 1. Sensordaten auslesen und auf OLED ausgeben------------------------
+
+def bme_temperature(x,y):
     temperature = sensor.temperature
-    oled.text("Temp: {:.2f} C".format(temperature), 0, 40)
+    oled.text("Temp: {:.2f} C".format(temperature), x, y)
     return temperature
     
-def bme_humidity():    
-    humidity = sensor.humidity
-    oled.text("Humidity: {:.2f}%".format(humidity), 0, 70)
-    return humidity
+def bme_humidity(x,y):
+        humidity = sensor.humidity
+        oled.text("Humidity: {:.2f}%".format(humidity), x, y)
+        return humidity
     
-def bme_pressure():
-    pressure = sensor.pressure
-    oled.text("Pressure: {:.2f} hPa".format(pressure), 0, 100)
-    return pressure
+def bme_pressure(x,y):
+        pressure = sensor.pressure
+        oled.text("Pressure: {:.2f} hPa".format(pressure), x, y)
+        return pressure
 
 def bme_altitude ():
     altitude = sensor.altitude(x)
     print (altitude)
 
-buffer_positive = bytearray(b'\x00\x0f\xf0\x00\x00\x7f\xfe\x00\x01\xff\xff\x80\x03\xff\xff\xc0\x07\xff\xff\xe0\x0f\xff\xff\xf0\x1f\xff\xff\xf8?\xff\xff\xfc?\xff\xff\xfc\x7f\xff\xff\xfe\x7f\x9f\xf9\xfe\x7f\x9f\xf1\xfe\xff\x9f\xfb\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xfc\x00\x00\x7f~\x00\x00~~\x00\x00~\x7f\x00\x00\xfe?\x00\x01\xfc?\x80\x01\xfc\x1f\xe0\x07\xf8\x0f\xf8\x1f\xf0\x07\xff\xff\xe0\x03\xff\xff\xc0\x01\xff\xff\x80\x00\x7f\xfe\x00\x00\x0f\xf0\x00')
-
-def evaluate_room_ambience():
-    fb = framebuf.FrameBuffer(buffer_positive, 32, 32, framebuf.MONO_HLSB)
-    oled.blit(fb, 90, 0)
-
+#-----------------2. Daten über MQTT verschicken------------------------------------
+    
 def send_MQTT():
-    temperature = bme_temperature()
-    humidity = bme_humidity()
-    pressure = bme_pressure()
+    if str(configuration)[3] == "1":
+        temperature = bme_temperature(10,10)
+        humidity = bme_humidity(10,10)
+        pressure = bme_pressure(10,10)
     
     
-    message = ujson.dumps({
-        "Temp": temperature,
-        "Humidity": humidity,
-        "Pressure": pressure,
-    })
+        message = ujson.dumps({
+            "Temp": temperature,
+            "Humidity": humidity,
+            "Pressure": pressure,
+        })
     
-    mqttClient.publish(MQTT_TOPIC, message)
+        mqttClient.publish(MQTT_TOPIC, message)
+    else:
+        pass
     
-def web_page():
+#------------------3. Sensordaten bewerten--------------------------------------------
+    
+def temp_score():
+    if 18 <= sensor.temperature <= 24:
+        return 0
+    elif 15 <= sensor.temperature < 18 or 24 < sensor.temperature <= 27:
+        return 0.5
+    elif sensor.temperature < 15 or sensor.temperature > 27:
+        return 1
+    else:
+        return None 
 
-  html = """<html><head><title>Netzwerk Smart Production</title>
+def pres_score():
+    if 30 <= sensor.pressure <= 50:
+        return 0
+    elif 20 <= sensor.pressure < 30 or 50 < sensor.pressure <= 60:
+        return 0.5
+    elif sensor.pressure < 20 or sensor.pressure > 60:
+        return 1
+    else:
+        return None
+
+def calculate_total_score():
+    score_temp = temp_score() * 0.1
+    score_pres = pres_score() * 0.1
+    score_res = ((500000-sensor.gas)/500000) * 0.8
+
+    if score_temp is not None and score_pres is not None:
+        total_score = score_temp + score_pres + score_res
+        return total_score
+    else:
+        return None
+
+total_score = calculate_total_score()
+
+def room_ambience (total_score):
+    if str(configuration)[2] == "1":
+        if 0 <= total_score < 0.34:
+            fb = framebuf.FrameBuffer(buffer_good, 32, 29, framebuf.MONO_HLSB)
+            oled.blit(fb, 90, 0)
+            return "good"
+        elif 0.34 <= total_score < 0.67:
+            fb = framebuf.FrameBuffer(buffer_ok, 32, 28, framebuf.MONO_HLSB)
+            oled.blit(fb, 90, 0)
+            return "ok"
+        elif 0.67 <= total_score <= 1:
+            fb = framebuf.FrameBuffer(buffer_bad, 32, 31, framebuf.MONO_HLSB)
+            oled.blit(fb, 90, 0)
+            return "bad"
+        else:
+            return None
+    else:
+        return "---"
+
+
+
+#------------------4. Daten über Webserver ausgeben--------------------------------------------
+
+def web_bme():
+    if str(configuration)[1] == "1":
+        Data = {"Temperature": str(round(sensor.temperature, 2)), "Humidity": "---", "Pressure": "---"}
+        return Data
+    elif str(configuration)[1] == "2":
+        Data = {"Temperature": str(round(sensor.temperature, 2)), "Humidity": str(round(sensor.humidity, 2)), "Pressure": "---"}
+        return Data
+    elif str(configuration)[1] == "3":
+        Data = {"Temperature": str(round(sensor.temperature, 2)), "Humidity": str(round(sensor.humidity, 2)), "Pressure": str(round(sensor.humidity, 2))}
+        return Data
+    else:
+        Data = {"Temperature": "Error", "Humidity": "Error", "Pressure": "Error"}
+        return Data
+        
+def web_page():
+  Data = web_bme()
+  html = """<!DOCTYPE html>
+  <html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="3">
+  <title>Netzwerk Smart Production</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" href="data:,"><style>body { text-align: center; font-family: "Trebuchet MS", Arial;}
-  table { border-collapse: collapse; margin-left:auto; margin-right:auto; }
-  th { padding: 12px; background-color: #0043af; color: white; }
-  tr { border: 1px solid #ddd; padding: 12px; }
-  tr:hover { background-color: #00FF00; }
-  td { border: none; padding: 12px; }
-  .sensor { color:white; font-weight: bold; background-color: #bcbcbc; padding: 1px;
-  </style></head><body><h1>Netzwerk Smart Production</h1>
-  <table><tr><th>MEASUREMENT</th><th>VALUE</th></tr>
-  <tr><td>Temp. Celsius</td><td><span class="sensor">""" + str(round(sensor.temperature, 2)) + """ C</span></td></tr>
-  <tr><td>Temp. Fahrenheit</td><td><span class="sensor">""" + str(round((sensor.temperature) * (9/5) + 32, 2))  + """ F</span></td></tr>
-  <tr><td>Pressure</td><td><span class="sensor">""" + str(round(sensor.pressure, 2)) + """ hPa</span></td></tr>
-  <tr><td>Humidity</td><td><span class="sensor">""" + str(round(sensor.humidity, 2)) + """ %</span></td></tr>
-  <tr><td>Gas</td><td><span class="sensor">""" + str(round(sensor.gas/1000, 2)) + """ KOhms</span></td></tr></body></html>"""
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
+  <link rel="icon" href="data:,">
+  <style>
+    html {font-family: Arial; display: inline-block; text-align: center;}
+    p {  font-size: 1.2rem;}
+    body {  margin: 0;}
+    .topnav { overflow: hidden; background-color: #FFFFFF; color: white; font-size: 1.7rem; }
+    .content { padding: 20px; }
+    .card { background-color: white; box-shadow: 2px 2px 12px 1px rgba(140,140,140,.5); }
+    .cards { max-width: 700px; margin: 0 auto; display: grid; grid-gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+    .reading { font-size: 2.8rem; }
+    .card.temperature { color: #990000; }
+    .card.humidity { color: #008080; }
+    .card.pressure { color: #CC9900; }
+    .card.gas { color: #00008B; }
+  </style>
+</head>
+<body>
+  <div class="topnav">
+    <img src="https://www.smartproduction.de/basisTheme/common/logo.png" alt="Logo" style="max-width: 100%; height: auto;">
+  </div>
+  <div class="content">
+    <div class="cards">
+      <div class="card temperature" style="color: #990000;">
+        <h4><i class="fas fa-thermometer-half"></i> TEMPERATURE</h4><p><span class="reading"><span id="temp">""" + Data["Temperature"] + """</span> &deg;C</span></p>
+      </div>
+      <div class="card humidity" style="color: #008080;">
+        <h4><i class="fas fa-tint"></i> HUMIDITY</h4><p><span class="reading"><span id="hum">""" + Data["Humidity"] + """</span> &percnt;</span></p>
+      </div>
+      <div class="card pressure" style="color: #CC9900;">
+        <h4><i class="fas fa-angle-double-down"></i> PRESSURE</h4><p><span class="reading"><span id="pres">""" + Data["Pressure"] + """</span> hPa</span></p>
+      </div>
+      <div class="card gas" style="color: #00008B;">
+        <h4><i class="fas fa-wind"></i> AIR QUALITY</h4><p><span class="reading"><span id="gas">""" + room_ambience(total_score) + """</span> </span></p>
+      </div>
+    </div>
+  </div>
+<img src="https://www.cemos.org/images/cemos_logo_text_rgb_zw-p-500.png" alt="Bild am unteren Ende" style="max-width: 200px; height: auto; display: block; margin: 10px auto 20px;">
+</body>
+</html>"""
   return html
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -75,46 +200,76 @@ s.bind(('', 80))
 s.listen(5)
 
 def Webserver():
-  try:
-    if gc.mem_free() < 102000:
-      gc.collect()
-    conn, addr = s.accept()
-    conn.settimeout(3.0)
-    print('Got a connection from %s' % str(addr))
-    request = conn.recv(1024)
-    conn.settimeout(None)
-    request = str(request)
-    print('Content = %s' % request)
-    response = web_page()
-    conn.send('HTTP/1.1 200 OK\n')
-    conn.send('Content-Type: text/html\n')
-    conn.send('Connection: close\n\n')
-    conn.sendall(response)
-    conn.close()
-  except OSError as e:
-    conn.close()
-    print('Connection closed')
+    while True:
+        if str(configuration)[4] == "1":
+          try:
+            if gc.mem_free() < 102000:
+              gc.collect()
+            conn, addr = s.accept()
+            conn.settimeout(3.0)
+            print('Got a connection from %s' % str(addr))
+            request = conn.recv(1024)
+            conn.settimeout(None)
+            request = str(request)
+            print('Content = %s' % request)
+            response = web_page()
+            conn.send('HTTP/1.1 200 OK\n')
+            conn.send('Content-Type: text/html\n')
+            conn.send('Connection: close\n\n')
+            conn.sendall(response)
+            conn.close()
+          except OSError as e:
+            conn.close()
+            print('Connection closed')
+        else:
+            pass
 
-while True:
-    oled.sleep(False)
-    oled.fill(0)
-    oled.text ("BME 680:", 0, 10, 1)
-    bme_temperature()
-    oled.hline (0, 60, 128, 1)
-    bme_humidity()
-    oled.hline (0, 90, 128, 1)
-    bme_pressure()
-    evaluate_room_ambience()
-    oled.show()
-    send_MQTT()
-    #Webserver()
-    time.sleep(3)
+#------------------5. Hauptschleife - Abhängig von der Konfiguration in der Verwaltungsschale--------------------------------------------
+        
+def main_loop():
+    while True:
+        if str(configuration)[1] == "3":
+            oled.sleep(False)
+            oled.fill(0)
+            oled.text ("CeMos", 0, 10, 1)
+            bme_temperature(0, 40)
+            oled.hline (0, 60, 128, 1)
+            bme_humidity(0, 70)
+            oled.hline (0, 90, 128, 1)
+            bme_pressure(0, 100)
+            room_ambience(total_score)
+            oled.show()
+            send_MQTT()
+            time.sleep(3)
+        elif str(configuration)[1] == "2":
+            oled.sleep(False)
+            oled.fill(0)
+            oled.text ("CeMos", 0, 10, 1)
+            bme_temperature(0, 50)
+            oled.hline (0, 70, 128, 1)
+            bme_humidity(0, 80)
+            room_ambience(total_score)
+            oled.show()
+            send_MQTT()
+            time.sleep(3)
+        elif str(configuration)[1] == "1":
+            oled.sleep(False)
+            oled.fill(0)
+            oled.text ("CeMos", 0, 10, 1)
+            bme_temperature(0, 70)
+            room_ambience(total_score)
+            oled.show()
+            send_MQTT()
+            time.sleep(3)
+        else:
+            oled.sleep(False)
+            oled.fill(0)
+            oled.text ("Konfiguration nicht gefunden:", 0, 50, 1)
+       
+#------------------Starten der Hauptschleife + neuer Thread für den Webserver --------
+#-------------------------------------------------------------------------------------
+            
+_thread.start_new_thread(Webserver, ())
+main_loop()
+
     
-    
-
-
-
-
-
-
-print (sensor.temperature)
