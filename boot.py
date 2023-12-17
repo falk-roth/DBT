@@ -21,12 +21,12 @@ from umqtt.simple import MQTTClient
 
 #--------------------Konfiguration WLan und MQTT Broker------------------------------------------------------------------------------------
 
-WLAN_SSID = "S23 von Falk"
-WLAN_PW = "1224512345"
+WLAN_SSID = ""
+WLAN_PW = ""
 
-MQTT_BROKER = "mq.jreichwald.de"
-MQTT_USERNAME = "dbt"
-MQTT_PW = "dbt"
+MQTT_BROKER = ""
+MQTT_USERNAME = ""
+MQTT_PW = ""
 MQTT_TOPIC = "NSP_Test"
 
 
