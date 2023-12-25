@@ -74,10 +74,6 @@ def bme_pressure(x,y):
         oled.text("Press:{:.0f} hPa".format(pressure), x, y)
         return pressure
 
-def bme_altitude ():
-    altitude = sensor.altitude(x)
-    print (altitude)
-
 #----------------------------------------Trend Temperature/Humidity-------------------------------------------------------------
 
 async def prev_temp():
@@ -141,23 +137,23 @@ def temp_score():
     else:
         return None 
 
-def pres_score():
-    if 30 <= sensor.pressure <= 50:
+def hum_score():
+    if 30 <= sensor.humidity <= 50:
         return 0
-    elif 20 <= sensor.pressure < 30 or 50 < sensor.pressure <= 60:
+    elif 20 <= sensor.humidity < 30 or 50 < sensor.humidity <= 60:
         return 0.5
-    elif sensor.pressure < 20 or sensor.pressure > 60:
+    elif sensor.humidity < 20 or sensor.humidity > 60:
         return 1
     else:
         return None
 
 def calculate_total_score():
     score_temp = temp_score() * 0.1
-    score_pres = pres_score() * 0.1
+    score_hum = hum_score() * 0.1
     score_res = ((500000-sensor.gas)/500000) * 0.8
 
     if score_temp is not None and score_pres is not None:
-        total_score = score_temp + score_pres + score_res
+        total_score = score_temp + score_hum + score_res
         return total_score
     else:
         return None
@@ -195,7 +191,7 @@ def web_bme():
         Data = {"Temperature": str(round(sensor.temperature, 2)), "Humidity": str(round(sensor.humidity, 2)), "Pressure": "---"}
         return Data
     elif str(configuration)[1] == "3":
-        Data = {"Temperature": str(round(sensor.temperature, 2)), "Humidity": str(round(sensor.humidity, 2)), "Pressure": str(round(sensor.humidity, 2))}
+        Data = {"Temperature": str(round(sensor.temperature, 2)), "Humidity": str(round(sensor.humidity, 2)), "Pressure": str(round(sensor.pressure, 2))}
         return Data
     else:
         Data = {"Temperature": "Error", "Humidity": "Error", "Pressure": "Error"}
